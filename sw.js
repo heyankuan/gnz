@@ -1,7 +1,7 @@
-// 离线缓存：首次打开时把程序和识别模型全部存到手机上，之后不联网也能用。
-const VERSION = 'gnz-v2';
-const FILES = ['./', 'index.html', 'app.js', 'ocr.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
-  'sync.js', 'vendor/ort.wasm.min.js', 'vendor/ort-wasm-simd-threaded.mjs', 'vendor/ort-wasm-simd-threaded.wasm', 'models/rec.onnx', 'models/keys.txt'];
+// 离线缓存：程序存到手机上，网不好也能打开、查看上次同步的数据。
+const VERSION = 'gnz-v3';
+// 只预存程序本身；识别模型（约 22MB）在第一次识别时才下载并存下，只查看的手机不用下
+const FILES = ['./', 'index.html', 'app.js', 'ocr.js', 'sync.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'vendor/ort.wasm.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
