@@ -445,22 +445,48 @@ $('#restoreFile').onchange = async e => {
   });
 };
 $('#importOldBtn').onclick = () => $('#oldFile').click();
+// 读表格文件：支持 csv（UTF-8 或 GBK）、Excel 的 xlsx / xls、旧程序的 json 备份
+function loadScriptOnce(src) {
+  return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`) && window.XLSX) return res(); const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('表格组件加载失败，请联网后重试')); document.head.appendChild(sc); });
+}
+async function readTableFile(f) {
+  const buf = new Uint8Array(await f.arrayBuffer());
+  const isZip = buf[0] === 0x50 && buf[1] === 0x4B, isOle = buf[0] === 0xD0 && buf[1] === 0xCF;
+  if (isZip || isOle || /\.(xlsx|xls)$/i.test(f.name)) {
+    await loadScriptOnce('vendor/xlsx.full.min.js');
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return { table: XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', dateNF: 'yyyy-mm-dd' }) };
+  }
+  let text = new TextDecoder('utf-8').decode(buf);
+  if (text.includes('\uFFFD')) { try { text = new TextDecoder('gbk').decode(buf); } catch { } }  // WPS / Excel 存的 csv 常是 GBK
+  text = text.replace(/^\uFEFF/, '');
+  if (/^\s*[{\[]/.test(text)) return { json: JSON.parse(text) };
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const sep = lines[0] && lines[0].includes('\t') && !lines[0].includes(',') ? '\t' : ',';
+  return { table: lines.map(l => l.split(sep).map(c => c.replace(/^"|"$/g, ''))) };
+}
 $('#oldFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   let rows = [];
   try {
-    const text = (await f.text()).replace(/^﻿/, '');
-    if (/^\s*[{\[]/.test(text)) {
-      const data = JSON.parse(text); const list = Array.isArray(data) ? data : data.items;
-      if (!Array.isArray(list)) throw new Error(Array.isArray(data.receipts) ? '这是新程序的备份，请用“从备份恢复”' : '没有找到商品列表');
+    const got = await readTableFile(f);
+    if (got.json) {
+      const data = got.json; const list = Array.isArray(data) ? data : data.items;
+      if (!Array.isArray(list)) throw new Error(Array.isArray(data.receipts) ? '这是本程序的备份，请用“从备份恢复”' : '没有找到商品列表');
       rows = list.map(x => ({ code: normText(x.code), name: normText(x.name || ''), qty: normNum(x.qty), cost: normNum(x.cost), supplier: normText(x.supplier || '') || '旧数据', date: x.date || '' }));
     } else {
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      const head = lines.shift().split(',').map(s => s.trim());
-      const ix = n => head.findIndex(h => h.startsWith(n));
-      const [iD, iS, iC, iN, iQ, iP] = [ix('入库'), ix('供应商'), ix('款号'), ix('名称'), ix('数量'), ix('进货')];
-      if (iC < 0 || iQ < 0 || iP < 0) throw new Error('表格需要有 款号、数量、进货单价 三列');
-      rows = lines.map(l => { const c = l.split(','); return { code: normText(c[iC]), name: iN >= 0 ? normText(c[iN]) : '', qty: normNum(c[iQ]), cost: normNum(c[iP]), supplier: (iS >= 0 ? normText(c[iS]) : '') || '旧数据', date: iD >= 0 ? (c[iD] || '').trim() : '' }; });
+      const table = got.table.filter(r => r.some(c => String(c).trim()));
+      // 表头可能不在第一行（前面有标题），找含“款号”的那一行
+      const hi = table.findIndex(r => r.some(c => /款号|货号/.test(String(c))));
+      if (hi < 0) throw new Error('表格里没找到“款号”这一列的标题');
+      const head = table[hi].map(c => String(c).trim());
+      const ix = re => head.findIndex(h => re.test(h));
+      const [iD, iS, iC, iN, iQ, iP] = [ix(/入库|日期/), ix(/供应商|档口/), ix(/款号|货号/), ix(/名称|品名/), ix(/数量|件数/), ix(/进货|单价|进价|价格/)];
+      const miss = [iC < 0 && '款号', iQ < 0 && '数量', iP < 0 && '进货单价'].filter(Boolean);
+      if (miss.length) throw new Error('表格里没找到这几列：' + miss.join('、') + '。现在的列是：' + head.filter(Boolean).join('、'));
+      const asDate = v => { v = String(v || '').trim(); const m = /^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/.exec(v); return m ? `${m[1]}-${pad2(m[2])}-${pad2(m[3])}` : ''; };
+      rows = table.slice(hi + 1).map(c => ({ code: normText(c[iC]), name: iN >= 0 ? normText(c[iN]) : '', qty: normNum(c[iQ]), cost: normNum(c[iP]), supplier: (iS >= 0 ? normText(c[iS]) : '') || '旧数据', date: iD >= 0 ? asDate(c[iD]) : '' }));
     }
   } catch (err) { return toast('文件读不了：' + (err.message || '格式不对')); }
   rows = rows.filter(r => r.code && Number.isInteger(r.qty) && r.qty > 0 && r.cost != null && r.cost >= 0);
