@@ -44,15 +44,22 @@ const GnzSync = (() => {
   // ---------- GitHub 接口（录入用） ----------
   const ghHeaders = () => ({ Authorization: 'Bearer ' + cfg.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' });
   async function ghGet() {
+    // 先取文件信息（版本号 sha）；文件超过 1MB 时接口不带内容，再单独下载原文
+    const q = '?ref=main&t=' + Date.now();
     let r;
-    try { r = await fetch(API + '?ref=main&t=' + Date.now(), { headers: ghHeaders(), cache: 'no-store' }); }
+    try { r = await fetch(API + q, { headers: { ...ghHeaders(), Accept: 'application/vnd.github.object' }, cache: 'no-store' }); }
     catch { const e = new Error('连不上数据服务器，请检查网络后重试'); e.code = 'network'; throw e; }
     if (r.status === 404) return { sha: null, text: null };
     if (r.status === 401) { const e = new Error('录入钥匙无效或已过期，请重新填写'); e.code = 'bad_token'; throw e; }
     if (r.status === 403) { const e = new Error('录入钥匙没有写入权限，或请求太频繁'); e.code = 'forbidden'; throw e; }
     if (!r.ok) { const e = new Error('数据服务器暂时不可用（' + r.status + '）'); e.code = 'upstream'; throw e; }
     const j = await r.json();
-    return { sha: j.sha, text: fromUtf8b64(j.content) };
+    if (j.content && j.encoding === 'base64') return { sha: j.sha, text: fromUtf8b64(j.content) };
+    let raw;
+    try { raw = await fetch(API + q, { headers: { ...ghHeaders(), Accept: 'application/vnd.github.raw' }, cache: 'no-store' }); }
+    catch { const e = new Error('连不上数据服务器，请检查网络后重试'); e.code = 'network'; throw e; }
+    if (!raw.ok) { const e = new Error('读取数据失败（' + raw.status + '）'); e.code = 'upstream'; throw e; }
+    return { sha: j.sha, text: await raw.text() };
   }
   async function ghPut(text, sha, message) {
     let r;
