@@ -467,9 +467,19 @@ $('#oldFile').onchange = async e => {
   if (!rows.length) return toast('文件里没有可导入的货品');
   const groups = new Map();
   for (const r of rows) { const d = /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : today(); const k = r.supplier + '\u0000' + d; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
-  confirmSheet('导入旧程序数据', `共 ${rows.length} 条货品，按供应商分成 ${groups.size} 批。没有入库日期的记为今天，导入后可以在记录里修改。`, '导入', () => {
-    const add = [...groups].map(([k, list]) => { const [supplier, date] = k.split('\u0000'); return { id: uid(), supplier, date, createdAt: new Date().toISOString(), source: 'import', items: list.map(r => ({ id: uid(), code: r.code, name: r.name, qty: r.qty, cost: r2(r.cost) })) }; });
-    commit(d => { d.receipts.push(...add); }, '导入旧数据').then(ok => ok && toast('导入完成'));
+  const existing = [...groups.keys()].filter(k => { const [sp, dt] = k.split('\u0000'); return receipts.some(r => r.supplier === sp && r.date === dt); }).length;
+  const qty = rows.reduce((s, r) => s + r.qty, 0);
+  confirmSheet('导入表格', `共 ${rows.length} 条货品、${qty} 件。${existing ? '供应商和日期相同的，会并入已有的那一批。' : ''}没有入库日期的记为今天，导入后可以在记录里修改。`, '导入', () => {
+    // 供应商 + 日期相同的并入已有批次，否则新建一批
+    commit(d => {
+      for (const [k, list] of groups) {
+        const [supplier, date] = k.split('\u0000');
+        const items = list.map(r => ({ id: uid(), code: r.code, name: r.name, qty: r.qty, cost: r2(r.cost) }));
+        const same = d.receipts.find(r => r.supplier === supplier && r.date === date);
+        if (same) same.items.push(...items);
+        else d.receipts.push({ id: uid(), supplier, date, createdAt: new Date().toISOString(), source: 'import', items });
+      }
+    }, `导入表格 ${rows.length}条`).then(ok => ok && toast(`已导入 ${rows.length} 条`));
   });
 };
 // ---------- 同步、密码、录入权限 ----------

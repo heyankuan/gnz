@@ -1,5 +1,5 @@
 // 离线缓存：程序存到手机上，网不好也能打开、查看上次同步的数据。
-const VERSION = 'gnz-v5';
+const VERSION = 'gnz-v6';
 // 只预存程序本身；识别模型（约 22MB）在第一次识别时才下载并存下，只查看的手机不用下
 const FILES = ['./', 'index.html', 'app.js', 'ocr.js', 'sync.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'vendor/ort.wasm.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
