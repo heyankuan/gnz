@@ -2,7 +2,7 @@
 // 逛女装 · 进货查价（手机本地版）
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const MULT = [['普通会员', 1.8], ['白金会员', 1.6], ['黄金会员', 1.4]];
+const MULT = [['普通会员', 1.8], ['白金会员', 1.6], ['黄金会员', 1.5]];
 const r2 = n => Math.round(n * 100) / 100;
 const fmt = n => (n == null || !Number.isFinite(+n)) ? '—' : String(r2(+n));
 const pad2 = n => String(n).padStart(2, '0');
