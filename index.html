@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>逛女装进货查价</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="逛女装">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#7b2d50">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* 布局：手机单列；查价结果做成“吊牌”卡片；核对页每行上方是小票原图条，下方是可改的字段，底部固定确认栏。 */
+:root{
+  --bg:#f4f0f2; --paper:#fffdfb; --ink:#2b2230; --muted:#857a82; --line:#e4dbe0;
+  --accent:#7b2d50; --accent-ink:#ffffff; --accent-soft:#f3e4eb;
+  --ok:#2f7652; --ok-soft:#e3f2e9; --warn:#9a6212; --warn-soft:#fff1d6; --bad:#b03535; --bad-soft:#fbe6e6;
+  --f-body:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --f-num:"DIN Alternate","SF Mono",ui-monospace,"Roboto Mono",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#17121a; --paper:#221b25; --ink:#efe7ec; --muted:#a3969e; --line:#3a3040;
+  --accent:#e38bb1; --accent-ink:#2a0f1c; --accent-soft:#3a2230;
+  --ok:#7fd1a4; --ok-soft:#1d3428; --warn:#f0be6a; --warn-soft:#3a2d14; --bad:#f08f8f; --bad-soft:#3d1f1f; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+img{max-width:100%}
+.wrap{max-width:720px;margin:0 auto}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:16px 4px}
+header h1{margin:0;font-size:22px;letter-spacing:.06em}
+header small{color:var(--muted);font-size:12px}
+nav{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:4px;margin-block:10px 14px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+nav button{border:0;background:none;color:var(--ink);font:inherit;font-size:15px;padding:10px 4px;border-radius:9px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:10px 16px;border-radius:10px;font-size:15px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn.block{width:100%;padding:14px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;color:var(--accent);padding:4px 0;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+input,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:10px 11px;width:100%;min-width:0}
+textarea{min-height:150px;line-height:1.6}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted);font-size:13px}
+.notice{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+.notice.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.notice.bad{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.notice.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+/* 查价 */
+#q{font-size:22px;padding:14px 16px;border-radius:14px;border:2px solid var(--accent);font-family:var(--f-num)}
+.section-title{font-size:13px;color:var(--muted);margin:16px 2px 8px;letter-spacing:.04em}
+.tag{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px 14px 30px;position:relative}
+.tag::before{content:"";position:absolute;left:11px;top:20px;width:9px;height:9px;border-radius:50%;border:2px solid var(--line);background:var(--bg)}
+.tag-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.code{font-size:20px;font-weight:600;overflow-wrap:anywhere;min-width:0}
+.code b{font-family:var(--f-num);color:var(--accent);font-size:24px;margin-right:2px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:4px}
+.meta b{color:var(--ink);font-weight:600}
+.prices{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.price{border-radius:10px;padding:8px 6px;text-align:center;background:var(--bg)}
+.price small{display:block;font-size:11px;color:var(--muted)}
+.price strong{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:19px}
+.price.cost{background:var(--accent-soft)}
+.price.cost.hide strong{filter:blur(7px)}
+.toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);flex-direction:row}
+.toggle input{width:auto}
+.empty{text-align:center;padding:30px 16px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+.icon-btn{border:1px solid var(--line);background:var(--paper);color:var(--muted);border-radius:9px;padding:7px 10px;font-size:13px;flex:none}
+
+/* 录入 */
+.drop{border:2px dashed var(--line);border-radius:14px;padding:20px 14px;text-align:center;background:var(--paper)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;justify-content:center}
+.thumbs figure{margin:0;position:relative}
+.thumbs img{width:76px;height:110px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--line)}
+.thumbs button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);font-size:15px;line-height:1}
+.thumbs figcaption{font-size:11px;color:var(--muted);text-align:center}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+.rcard{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
+.rcard.flag{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
+.rcard.err{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad) inset}
+.strip{width:100%;border-radius:6px;border:1px solid var(--line);background:#fff;display:block}
+.rtop{display:flex;align-items:center;gap:8px}
+.seq{font-family:var(--f-num);font-size:12px;color:var(--muted);background:var(--bg);border-radius:6px;padding:2px 7px;flex:none}
+.rgrid{display:grid;grid-template-columns:1.3fr .7fr .8fr;gap:8px;align-items:end}
+.rgrid label{font-size:11px}
+.rgrid input,.rtop input{padding:8px 9px}
+.cell-flag input{border-color:var(--warn);background:var(--warn-soft)}
+.cell-err input{border-color:var(--bad);background:var(--bad-soft)}
+.rnote{font-size:12px;color:var(--warn)}
+.rnote.err{color:var(--bad)}
+.confirmbar{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:1px solid var(--line);z-index:6;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.confirmbar .inner{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.sum{font-size:14px}.sum b{font-family:var(--f-num);font-size:17px}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+
+/* 记录 */
+.batch{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.batch>summary{list-style:none;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.batch>summary::-webkit-details-marker{display:none}
+.batch .bt{font-weight:600}
+.items{border-top:1px solid var(--line)}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:14px}
+.item:last-child{border-bottom:0}
+.item .r{text-align:right;font-family:var(--f-num)}
+.item .acts{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}
+.bacts{display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg)}
+.toolbox{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* 弹层 */
+.modal{position:fixed;inset:0;background:rgba(20,10,18,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:12px}
+.sheet{background:var(--paper);color:var(--ink);border-radius:16px;padding:18px;width:100%;max-width:480px;max-height:88vh;overflow:auto;margin-bottom:env(safe-area-inset-bottom,0px)}
+.sheet h3{margin:0 0 12px;font-size:17px}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;z-index:30;max-width:90%;font-size:14px;text-align:center}
+body.ro .w{display:none!important}
+body.busy #saveBtn,body.busy #mOk{opacity:.5;pointer-events:none}
+@media (max-width:420px){.prices{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>逛女装</h1><small>进货查价</small></header>
+  <nav role="tablist">
+    <button id="tab-search" role="tab" aria-selected="true" data-tab="search">查价</button>
+    <button id="tab-import" class="w" role="tab" aria-selected="false" data-tab="import">录入小票</button>
+    <button id="tab-records" role="tab" aria-selected="false" data-tab="records">入库记录</button>
+  </nav>
+  <div id="banner" class="notice warn" hidden style="margin-bottom:12px"></div>
+
+  <!-- 查价 -->
+  <section id="view-search">
+    <input id="q" type="search" inputmode="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入款号，如 3389" aria-label="款号">
+    <div class="row" style="justify-content:space-between;margin-top:8px">
+      <span id="countInfo" class="muted"></span>
+      <label class="toggle"><input type="checkbox" id="hideCost"> 遮住进货价</label>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:4px">
+      <span id="syncInfo" class="muted"></span>
+      <button class="link" id="refreshBtn">刷新</button>
+    </div>
+    <div id="resultsTitle" class="section-title"></div>
+    <div id="results" class="stack"></div>
+  </section>
+
+  <!-- 录入 -->
+  <section id="view-import" hidden>
+    <div id="step-pick" class="stack">
+      <div class="drop">
+        <div style="font-size:16px;font-weight:600">选择电子小票截图</div>
+        <p class="muted" style="margin:6px 0 12px">一张小票太长、截了好几张的，请一次全部选上（第一张要带表头），程序会自动拼接并去掉重复的行。</p>
+        <button class="btn primary" id="pickBtn">从相册选择截图</button>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden>
+        <div id="thumbs" class="thumbs"></div>
+      </div>
+      <button class="btn primary block" id="recognizeBtn" disabled>开始识别</button>
+      <p class="muted" style="margin:0">识别在这台设备上完成，不用 AI。识别完逐行显示小票原图，方便对照核对。确认入库后会自动同步，其他手机刷新就能查到。</p>
+      <button class="link" id="doubaoOpen" style="align-self:flex-start">截图不是表格样式、识别不了？改用豆包识别 →</button>
+    </div>
+
+    <div id="step-run" class="stack" hidden>
+      <div class="notice stack" style="gap:8px">
+        <div id="runText">正在准备…</div>
+        <div class="bar"><i id="runBar"></i></div>
+        <div class="muted" id="runHint">第一次识别需要加载识别模型，稍等十几秒。</div>
+      </div>
+    </div>
+
+    <div id="step-doubao" class="stack" hidden>
+      <div class="notice stack" style="gap:10px">
+        <div style="font-weight:600">用豆包识别小票</div>
+        <ol class="steps">
+          <li>点下面“复制指令”。</li>
+          <li>打开豆包，发送小票截图，再把指令粘贴进去发送。</li>
+          <li>豆包回复后，长按回复 → 复制，回到这里粘贴到下面的框里。</li>
+        </ol>
+        <button class="btn" id="copyPrompt">复制指令</button>
+        <textarea id="doubaoText" placeholder="把豆包的回复粘贴到这里"></textarea>
+        <div class="row"><button class="btn primary" id="doubaoParse">读取</button><button class="btn" id="doubaoCancel">返回</button></div>
+      </div>
+    </div>
+
+    <div id="step-review" class="stack" hidden>
+      <div class="notice stack" style="gap:10px">
+        <div style="font-weight:600">这批货的信息</div>
+        <label>供应商 <input id="supplier" list="supplierList" placeholder="输入或选择供应商" autocomplete="off"></label>
+        <datalist id="supplierList"></datalist>
+        <label>入库时间 <input id="inDate" type="date"></label>
+      </div>
+      <div id="checks" class="stack"></div>
+      <div id="rows" class="stack"></div>
+      <div class="row">
+        <button class="btn small" id="addRow">＋ 手动加一行</button>
+        <button class="btn small" id="restart">放弃，重新选图</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 记录 -->
+  <section id="view-records" hidden>
+    <div class="notice stack" style="gap:10px;margin-bottom:12px">
+      <div class="row" style="justify-content:space-between"><b>录入权限</b><span id="permInfo" class="muted"></span></div>
+      <button class="btn small" id="permBtn" style="align-self:flex-start"></button>
+    </div>
+    <div class="notice stack" style="gap:10px;margin-bottom:12px">
+      <div class="row" style="justify-content:space-between"><b>数据备份</b><span id="backupInfo" class="muted"></span></div>
+      <div class="muted">数据加密保存在网上，换手机输入密码就能看到。另外也可以下载一份备份文件自己留着。</div>
+      <div class="toolbox">
+        <button class="btn small" id="backupBtn">下载备份</button>
+        <button class="btn small w" id="restoreBtn">从备份恢复</button>
+        <button class="btn small" id="exportBtn">导出表格(Excel)</button>
+        <button class="btn small w" id="importOldBtn">导入旧程序数据</button>
+      </div>
+      <input id="restoreFile" type="file" accept=".json,application/json" hidden>
+      <input id="oldFile" type="file" accept=".json,.csv,application/json,text/csv" hidden>
+    </div>
+    <div id="recInfo" class="muted" style="margin:0 2px 8px"></div>
+    <div id="batches" class="stack"></div>
+  </section>
+</div>
+
+<div id="confirmbar" class="confirmbar" hidden>
+  <div class="inner">
+    <div class="sum" id="sumText"></div>
+    <button class="btn primary" id="saveBtn">确认入库</button>
+  </div>
+</div>
+<div id="modal" class="modal" hidden><div class="sheet" id="sheet"></div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="vendor/ort.wasm.min.js"></script>
+<script src="ocr.js"></script>
+<script src="sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
