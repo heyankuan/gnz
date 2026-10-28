@@ -140,7 +140,7 @@ body.busy #saveBtn,body.busy #mOk{opacity:.5;pointer-events:none}
   <header><h1>逛女装</h1><small>进货查价</small></header>
   <nav role="tablist">
     <button id="tab-search" role="tab" aria-selected="true" data-tab="search">查价</button>
-    <button id="tab-import" class="w" role="tab" aria-selected="false" data-tab="import">录入小票</button>
+    <button id="tab-import" role="tab" aria-selected="false" data-tab="import">录入小票</button>
     <button id="tab-records" role="tab" aria-selected="false" data-tab="records">入库记录</button>
   </nav>
   <div id="banner" class="notice warn" hidden style="margin-bottom:12px"></div>
@@ -162,6 +162,11 @@ body.busy #saveBtn,body.busy #mOk{opacity:.5;pointer-events:none}
 
   <!-- 录入 -->
   <section id="view-import" hidden>
+    <div id="noPerm" class="notice stack" hidden style="gap:10px">
+      <b>这台设备还没开通录入</b>
+      <div class="muted">没开通的设备只能查价。要在这台设备上录入小票，需要填一次“录入钥匙”。</div>
+      <button class="btn primary" id="permBtn2" style="align-self:flex-start">开启录入</button>
+    </div>
     <div id="step-pick" class="stack">
       <div class="drop">
         <div style="font-size:16px;font-weight:600">选择电子小票截图</div>

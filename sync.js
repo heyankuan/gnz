@@ -46,21 +46,21 @@ const GnzSync = (() => {
   async function ghGet() {
     let r;
     try { r = await fetch(API + '?ref=main&t=' + Date.now(), { headers: ghHeaders(), cache: 'no-store' }); }
-    catch { const e = new Error('连不上 GitHub，请检查网络后重试'); e.code = 'network'; throw e; }
+    catch { const e = new Error('连不上数据服务器，请检查网络后重试'); e.code = 'network'; throw e; }
     if (r.status === 404) return { sha: null, text: null };
-    if (r.status === 401) { const e = new Error('录入令牌无效或已过期，请重新填写'); e.code = 'bad_token'; throw e; }
-    if (r.status === 403) { const e = new Error('录入令牌没有写入权限，或请求太频繁'); e.code = 'forbidden'; throw e; }
-    if (!r.ok) { const e = new Error('GitHub 暂时不可用（' + r.status + '）'); e.code = 'upstream'; throw e; }
+    if (r.status === 401) { const e = new Error('录入钥匙无效或已过期，请重新填写'); e.code = 'bad_token'; throw e; }
+    if (r.status === 403) { const e = new Error('录入钥匙没有写入权限，或请求太频繁'); e.code = 'forbidden'; throw e; }
+    if (!r.ok) { const e = new Error('数据服务器暂时不可用（' + r.status + '）'); e.code = 'upstream'; throw e; }
     const j = await r.json();
     return { sha: j.sha, text: fromUtf8b64(j.content) };
   }
   async function ghPut(text, sha, message) {
     let r;
     try { r = await fetch(API, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ message, content: utf8b64(text), branch: 'main', ...(sha ? { sha } : {}) }) }); }
-    catch { const e = new Error('连不上 GitHub，没有保存，请检查网络后重试'); e.code = 'network'; throw e; }
+    catch { const e = new Error('连不上数据服务器，没有保存，请检查网络后重试'); e.code = 'network'; throw e; }
     if (r.status === 409 || r.status === 422) { const e = new Error('数据刚被另一台设备改过'); e.code = 'conflict'; throw e; }
-    if (r.status === 401) { const e = new Error('录入令牌无效或已过期，请重新填写'); e.code = 'bad_token'; throw e; }
-    if (r.status === 403 || r.status === 404) { const e = new Error('录入令牌没有这个仓库的写入权限'); e.code = 'forbidden'; throw e; }
+    if (r.status === 401) { const e = new Error('录入钥匙无效或已过期，请重新填写'); e.code = 'bad_token'; throw e; }
+    if (r.status === 403 || r.status === 404) { const e = new Error('录入钥匙没有这个仓库的写入权限'); e.code = 'forbidden'; throw e; }
     if (!r.ok) { const e = new Error('保存失败（' + r.status + '）'); e.code = 'upstream'; throw e; }
   }
 
@@ -117,11 +117,11 @@ const GnzSync = (() => {
   }
   async function checkToken(token) {
     const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } }).catch(() => null);
-    if (!r) throw new Error('连不上 GitHub，请检查网络');
-    if (r.status === 401) throw new Error('令牌无效，请检查是否复制完整');
-    if (!r.ok) throw new Error('这个令牌访问不了 ' + OWNER + '/' + REPO + ' 仓库');
+    if (!r) throw new Error('连不上数据服务器，请检查网络');
+    if (r.status === 401) throw new Error('录入钥匙无效，请检查是否复制完整');
+    if (!r.ok) throw new Error('这把录入钥匙打不开 ' + OWNER + '/' + REPO + ' 仓库');
     const j = await r.json();
-    if (!j.permissions?.push) throw new Error('这个令牌没有写入权限（Contents 需要选 Read and write）');
+    if (!j.permissions?.push) throw new Error('这把录入钥匙没有写入权限（生成时 Contents 要选 Read and write）');
   }
 
   return {

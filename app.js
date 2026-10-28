@@ -52,7 +52,7 @@ function showTab(t) {
   $('#confirmbar').hidden = !(t === 'import' && draft && !$('#step-review').hidden);
   if (t === 'search') renderSearch();
   if (t === 'records') renderRecords();
-  if (t === 'import') warmUp();
+  if (t === 'import') { renderPerm(); if (GnzSync.canWrite) warmUp(); }
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -525,16 +525,20 @@ function askPass(note) {
   };
 }
 function renderPerm() {
-  document.body.classList.toggle('ro', !GnzSync.canWrite);
-  $('#permInfo').textContent = GnzSync.canWrite ? '这台设备可以录入和修改' : '这台设备只能查看';
-  $('#permBtn').textContent = GnzSync.canWrite ? '移除录入权限' : '开启录入';
-  if (!GnzSync.canWrite && !$('#view-import').hidden) showTab('search');
+  const w = GnzSync.canWrite;
+  document.body.classList.toggle('ro', !w);
+  $('#permInfo').textContent = w ? '这台设备可以录入和修改' : '这台设备只能查看';
+  $('#permBtn').textContent = w ? '移除录入权限' : '开启录入';
+  $('#noPerm').hidden = w;
+  if (!w) { ['#step-pick', '#step-run', '#step-doubao', '#step-review'].forEach(s => $(s).hidden = true); $('#confirmbar').hidden = true; }
+  else if (!draft && $('#step-run').hidden && $('#step-doubao').hidden) $('#step-pick').hidden = false;
 }
+$('#permBtn2').onclick = () => $('#permBtn').click();
 $('#permBtn').onclick = () => {
-  if (GnzSync.canWrite) return confirmSheet('移除录入权限？', '移除后这台设备只能查看。以后要录入需要重新填写令牌。', '移除', () => { GnzSync.setToken(''); renderPerm(); }, true);
+  if (GnzSync.canWrite) return confirmSheet('移除录入权限？', '移除后这台设备只能查看。以后要录入需要重新填写录入钥匙。', '移除', () => { GnzSync.setToken(''); renderPerm(); }, true);
   $('#sheet').innerHTML = `<h3>开启录入</h3><div class="stack">
-    <p class="muted" style="margin:0">粘贴 GitHub 令牌（以 github_pat_ 开头）。令牌只保存在这台设备上。</p>
-    <label>GitHub 令牌<input id="tIn" autocomplete="off" autocorrect="off" spellcheck="false"></label>
+    <p class="muted" style="margin:0">粘贴录入钥匙（之前生成的那一长串字）。钥匙只保存在这台设备上，不会发给别人。</p>
+    <label>录入钥匙<input id="tIn" autocomplete="off" autocorrect="off" spellcheck="false"></label>
     <div class="row" style="justify-content:flex-end"><button class="btn" id="mCancel">取消</button><button class="btn primary" id="mOk">确定</button></div></div>`;
   $('#modal').hidden = false;
   $('#mCancel').onclick = closeModal;
