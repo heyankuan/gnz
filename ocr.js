@@ -122,12 +122,13 @@ const GnzOCR = (() => {
     let mode = 255, best = -1; for (let v = 0; v < 256; v++) if (hist[v] > best) { best = hist[v]; mode = v; }
     return Math.max(110, Math.min(215, mode - 45));
   }
-  function rowInk(g, W, y) { let n = 0; const o = y * W; for (let x = 0; x < W; x++) if (g[o + x] < INK) n++; return n; }
+  function rowInk(g, W, y, th = INK) { let n = 0; const o = y * W; for (let x = 0; x < W; x++) if (g[o + x] < th) n++; return n; }
   // 文字行（没有分隔线时的后备做法）
-  function textLines(g, W, y0, y1) {
+  function textLines(g, W, y0, y1, th = INK) {
     const lines = []; let s = -1;
     for (let y = y0; y < y1; y++) {
-      const has = rowInk(g, W, y) > 1;
+      const n = rowInk(g, W, y, th);
+      const has = n > 1 && n < 0.9 * W;
       if (has && s < 0) s = y;
       if (!has && s >= 0) { if (y - s > 6) lines.push([s, y]); s = -1; }
     }
@@ -237,10 +238,11 @@ const GnzOCR = (() => {
 
     // 2) 找表头：第一条分隔线上方最近的一行字；或任何能读出 ≥3 个表头词的行
     let layout = null;
+    const seenKeys = [];
     const tryHeader = async (y0, y1) => {
       const th = bandThresh(g, W, y0, y1);
       const segs = segments(g, W, y0, y1, Math.round(gap * 1.2), th);
-      if (segs.length < 3) return null;
+      if (!segs.length || segs.length > 12) return null;
       const cols = [];
       for (const [sx0, sx1] of segs) {
         const b = inkBox(g, W, sx0, y0, sx1, y1, th); if (!b) continue;
@@ -249,11 +251,13 @@ const GnzOCR = (() => {
         if (k && !cols.some(c => c.key === k)) cols.push({ key: k, x0: sx0, x1: sx1, text: r.text });
       }
       if (cols.length >= 3 && cols.some(c => c.key === 'qty' || c.key === 'price')) return { cols: cols.sort((a, b) => a.x0 - b.x0), W };
+      if (cols.length) seenKeys.push(...cols.map(c => c.key));
       return null;
     };
     let headerLineBottom = -1;
     if (seps.length >= 3) {
-      const lines = textLines(g, W, 0, seps[0][0]);
+      // 表头常是浅灰色字，用宽一点的阈值找字行
+      const lines = textLines(g, W, 0, seps[0][0], 210);
       for (let i = lines.length - 1; i >= Math.max(0, lines.length - 4) && !layout; i--) {
         layout = await tryHeader(lines[i][0], lines[i][1]);
         if (layout) headerLineBottom = lines[i][1];
@@ -264,7 +268,12 @@ const GnzOCR = (() => {
     }
     let usedPrev = false;
     if (!layout && lastLayout && Math.abs(lastLayout.W - W) < 4) { layout = lastLayout; usedPrev = true; }
-    if (!layout) throw new Error('没有找到表头（序号 / 款号 / 名称 / 数量 / 单价）。如果是长小票的后半截，请和带表头的第一张一起选上。也可以改用“豆包识别”。');
+    if (!layout && seenKeys.length) {
+      const NAME = { seq: '序号', code: '款号', name: '名称', qty: '数量', price: '单价' };
+      const miss = ['code', 'qty', 'price'].filter(k => !seenKeys.includes(k)).map(k => NAME[k]);
+      throw new Error(`截图里看不到${miss.join('、')}这几列，表格左右没有显示全。请横过手机再截图，或者用小票页面上的下载按钮保存完整的小票图片。`);
+    }
+    if (!layout) throw new Error('没有找到表头（序号 / 款号 / 名称 / 数量 / 单价）。如果是长小票的后半截，请和带表头的第一张一起选上。如果表格左右没显示全，请横过手机再截图，或用小票页面上的下载按钮保存完整图片。');
     lastLayout = layout;
 
     const cols = layout.cols;
